@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models;
@@ -114,27 +115,63 @@ namespace WebApplication1.Controllers
             return NoContent();
         }
 
-        [HttpPut("{productId}/{customerId}/{proposedPrice}")]
-        public async Task<ActionResult<NegotiationModel>> ProposeNegotiation(int productId, int customerId, decimal proposedPrice)
+        [HttpPost("{productId}/{customerId}/{proposedPrice}")]
+        public async Task<ActionResult<NegotiationModel>> PostNegotiation(int productId, int customerId, decimal proposedPrice)
         {
+            // Can't add a negotiation that already exist
+            if (_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
+                return BadRequest("Negocjacja o ten produkt już istnieje");
             // Check if price is valid
             if (proposedPrice <= 0)
+                return BadRequest("Proszę podać cenę większą od zera.");          
+            else
             {
+                int wasRejected = 0;
+                NegotiationModel.NegotiationStatus status = NegotiationModel.NegotiationStatus.Pending;
+                var basePrice = _context.ProductModel.Find(productId)?.BasePrice;
+                // check if price is twice bigger than base price, if so automatically reject proposition
+                if (basePrice.HasValue && proposedPrice > basePrice * 2) //Here I think it was meant to be half of the price
+                {
+                    wasRejected = 1;
+                    status = NegotiationModel.NegotiationStatus.Rejected;
+                }
+
+                NegotiationModel newNegotiation = new NegotiationModel()
+                {
+                    ProductId = productId,
+                    CustomerId = customerId,
+                    ProposedPrice = proposedPrice,
+                    AttemptsLeft = 3-wasRejected,
+                    Status = status
+                };
+                _context.NegotiationModel.Add(newNegotiation);
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction("GetNegotiationModel", new { id = newNegotiation.Id }, newNegotiation);
+            }   
+        }
+
+        [HttpPut("{productId}/{customerId}/{proposedPrice}")]
+        public async Task<ActionResult<NegotiationModel>> PutNegotiation(int productId, int customerId, decimal proposedPrice)
+        {
+            // Can't add a negotiation that already exist
+            if (!_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
+                return BadRequest("Negocjacja o ten produkt nie istnieje");
+            // Check if price is valid
+            else if (proposedPrice <= 0)
                 return BadRequest("Proszę podać cenę większą od zera.");
-            }
-
-            int wasRejected = 0;
-            NegotiationModel.NegotiationStatus status = NegotiationModel.NegotiationStatus.Pending;
-            var basePrice = _context.ProductModel.Find(productId)?.BasePrice;
-            // check if price is twice bigger than base price, if so automatically reject proposition
-            if (basePrice.HasValue && proposedPrice > basePrice * 2) //Here I think it was meant to be half of the price
+            else
             {
-                wasRejected = 1;
-                status = NegotiationModel.NegotiationStatus.Rejected;
-            }
+                int wasRejected = 0;
+                NegotiationModel.NegotiationStatus status = NegotiationModel.NegotiationStatus.Pending;
+                var basePrice = _context.ProductModel.Find(productId)?.BasePrice;
+                // check if price is twice bigger than base price, if so automatically reject proposition
+                if (basePrice.HasValue && proposedPrice > basePrice * 2) //Here I think it was meant to be half of the price
+                {
+                    wasRejected = 1;
+                    status = NegotiationModel.NegotiationStatus.Rejected;
+                }
 
-            if (_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
-            {
                 NegotiationModel? existingNegotiation = _context.NegotiationModel
                     .FirstOrDefault(n => n.ProductId == productId && n.CustomerId == customerId);
 
@@ -153,26 +190,12 @@ namespace WebApplication1.Controllers
 
                     await _context.SaveChangesAsync();
 
-                    return Ok(existingNegotiation); // This is a post method, yet it makes things much easier
-                                                    // if I put update of existing model here
+                    return Ok(existingNegotiation);
                 }
             }
-            else
-            {
-                NegotiationModel newNegotiation = new NegotiationModel()
-                {
-                    ProductId = productId,
-                    CustomerId = customerId,
-                    ProposedPrice = proposedPrice,
-                    AttemptsLeft = 3-wasRejected,
-                    Status = status
-                };
-                _context.NegotiationModel.Add(newNegotiation);
-                await _context.SaveChangesAsync();
-
-                return CreatedAtAction("GetNegotiationModel", new { id = newNegotiation.Id }, newNegotiation);
-            }   
         }
+
+        
 
         private bool NegotiationModelExists(int id)
         {
