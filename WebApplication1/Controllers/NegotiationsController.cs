@@ -6,20 +6,23 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
-using WebApplication1.Data;
-using WebApplication1.Models;
+using NegotiationsApi.Services;
+using NegotiationsApi.Data;
+using NegotiationsApi.Models;
 
-namespace WebApplication1.Controllers
+namespace NegotiationsApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class NegotiationsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly INegotiationService _negotiationService;
 
-        public NegotiationsController(AppDbContext context)
+        public NegotiationsController(AppDbContext context, INegotiationService negotiationService)
         {
             _context = context;
+            _negotiationService = negotiationService;
         }
 
         // GET: api/Negotiations
@@ -118,81 +121,13 @@ namespace WebApplication1.Controllers
         [HttpPost("{productId}/{customerId}/{proposedPrice}")]
         public async Task<ActionResult<NegotiationModel>> PostNegotiation(int productId, int customerId, decimal proposedPrice)
         {
-            // Can't add a negotiation that already exist
-            if (_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
-                return BadRequest("Negocjacja o ten produkt już istnieje");
-            // Check if price is valid
-            if (proposedPrice <= 0)
-                return BadRequest("Proszę podać cenę większą od zera.");          
-            else
-            {
-                int wasRejected = 0;
-                NegotiationModel.NegotiationStatus status = NegotiationModel.NegotiationStatus.Pending;
-                var basePrice = _context.ProductModel.Find(productId)?.BasePrice;
-                // check if price is twice bigger than base price, if so automatically reject proposition
-                if (basePrice.HasValue && proposedPrice > basePrice * 2) //Here I think it was meant to be half of the price
-                {
-                    wasRejected = 1;
-                    status = NegotiationModel.NegotiationStatus.Rejected;
-                }
-
-                NegotiationModel newNegotiation = new NegotiationModel()
-                {
-                    ProductId = productId,
-                    CustomerId = customerId,
-                    ProposedPrice = proposedPrice,
-                    AttemptsLeft = 3-wasRejected,
-                    Status = status
-                };
-                _context.NegotiationModel.Add(newNegotiation);
-                await _context.SaveChangesAsync();
-
-                return CreatedAtAction("GetNegotiationModel", new { id = newNegotiation.Id }, newNegotiation);
-            }   
+            return await _negotiationService.AddNegotiation(productId, customerId, proposedPrice);
         }
 
         [HttpPut("{productId}/{customerId}/{proposedPrice}")]
         public async Task<ActionResult<NegotiationModel>> PutNegotiation(int productId, int customerId, decimal proposedPrice)
         {
-            // Can't add a negotiation that already exist
-            if (!_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
-                return BadRequest("Negocjacja o ten produkt nie istnieje");
-            // Check if price is valid
-            else if (proposedPrice <= 0)
-                return BadRequest("Proszę podać cenę większą od zera.");
-            else
-            {
-                int wasRejected = 0;
-                NegotiationModel.NegotiationStatus status = NegotiationModel.NegotiationStatus.Pending;
-                var basePrice = _context.ProductModel.Find(productId)?.BasePrice;
-                // check if price is twice bigger than base price, if so automatically reject proposition
-                if (basePrice.HasValue && proposedPrice > basePrice * 2) //Here I think it was meant to be half of the price
-                {
-                    wasRejected = 1;
-                    status = NegotiationModel.NegotiationStatus.Rejected;
-                }
-
-                NegotiationModel? existingNegotiation = _context.NegotiationModel
-                    .FirstOrDefault(n => n.ProductId == productId && n.CustomerId == customerId);
-
-                if (existingNegotiation.Status == NegotiationModel.NegotiationStatus.Pending)
-                    return BadRequest("Ostatnia oferta oczekuje nadal oczekuje na decyzję.");
-                else if (existingNegotiation.AttemptsLeft == 0)
-                    return BadRequest("Przekroczono liczbę możliwych propozycji dla tego produktu.");
-                else
-                {
-                    existingNegotiation.AttemptsLeft -= wasRejected;
-                    if (existingNegotiation.AttemptsLeft == 0)
-                        status = NegotiationModel.NegotiationStatus.Rejected;
-
-                    existingNegotiation.Status = status;
-                    existingNegotiation.ProposedPrice = proposedPrice;
-
-                    await _context.SaveChangesAsync();
-
-                    return Ok(existingNegotiation);
-                }
-            }
+            return await _negotiationService.UpdateNegotiation(productId, customerId, proposedPrice);
         }
 
         

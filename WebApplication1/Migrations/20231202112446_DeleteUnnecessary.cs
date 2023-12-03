@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace WebApplication1.Migrations
+namespace NegotiationsApi.Migrations
 {
     /// <inheritdoc />
     public partial class DeleteUnnecessary : Migration

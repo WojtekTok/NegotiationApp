@@ -1,4 +1,4 @@
-﻿namespace WebApplication1.Models
+﻿namespace NegotiationsApi.Models
 {
     public class ProductModel
     {

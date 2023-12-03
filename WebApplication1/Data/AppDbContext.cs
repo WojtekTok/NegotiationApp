@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using WebApplication1.Models;
+using NegotiationsApi.Models;
 
-namespace WebApplication1.Data
+namespace NegotiationsApi.Data
 {
     public class AppDbContext : DbContext
     {
@@ -14,8 +14,8 @@ namespace WebApplication1.Data
         {
         }
 
-        public DbSet<WebApplication1.Models.ProductModel> ProductModel { get; set; } = default!;
+        public DbSet<NegotiationsApi.Models.ProductModel> ProductModel { get; set; } = default!;
 
-        public DbSet<WebApplication1.Models.NegotiationModel> NegotiationModel { get; set; } = default!;
+        public DbSet<NegotiationsApi.Models.NegotiationModel> NegotiationModel { get; set; } = default!;
     }
 }

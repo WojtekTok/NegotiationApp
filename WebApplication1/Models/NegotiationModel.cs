@@ -1,6 +1,6 @@
 ﻿using System.Runtime.Serialization;
 
-namespace WebApplication1.Models
+namespace NegotiationsApi.Models
 {
     public class NegotiationModel
     {
