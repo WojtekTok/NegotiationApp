@@ -54,50 +54,6 @@ namespace NegotiationsApi.Controllers
             return negotiationModel;
         }
 
-        // PUT: api/Negotiations/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutNegotiationModel(int id, NegotiationModel negotiationModel)
-        {
-            if (id != negotiationModel.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(negotiationModel).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!NegotiationModelExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Negotiations
-        [HttpPost]
-        public async Task<ActionResult<NegotiationModel>> PostNegotiationModel(NegotiationModel negotiationModel)
-        {
-          if (_context.NegotiationModel == null)
-          {
-              return Problem("Entity set 'AppDbContext.NegotiationModel'  is null.");
-          }
-            _context.NegotiationModel.Add(negotiationModel);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetNegotiationModel", new { id = negotiationModel.Id }, negotiationModel);
-        }
-
         // DELETE: api/Negotiations/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteNegotiationModel(int id)
@@ -118,23 +74,18 @@ namespace NegotiationsApi.Controllers
             return NoContent();
         }
 
+        // POST: api/Negotiations
         [HttpPost("{productId}/{customerId}/{proposedPrice}")]
         public async Task<ActionResult<NegotiationModel>> PostNegotiation(int productId, int customerId, decimal proposedPrice)
         {
             return await _negotiationService.AddNegotiation(productId, customerId, proposedPrice);
         }
 
+        // PUT: api/Negotiations
         [HttpPut("{productId}/{customerId}/{proposedPrice}")]
         public async Task<ActionResult<NegotiationModel>> PutNegotiation(int productId, int customerId, decimal proposedPrice)
         {
             return await _negotiationService.UpdateNegotiation(productId, customerId, proposedPrice);
-        }
-
-        
-
-        private bool NegotiationModelExists(int id)
-        {
-            return (_context.NegotiationModel?.Any(e => e.Id == id)).GetValueOrDefault();
         }
     }
 }
