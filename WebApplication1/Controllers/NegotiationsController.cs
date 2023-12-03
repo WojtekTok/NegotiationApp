@@ -27,7 +27,7 @@ namespace NegotiationsApi.Controllers
 
         // GET: api/Negotiations
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<NegotiationModel>>> GetNegotiationModel()
+        public async Task<ActionResult<IEnumerable<NegotiationModel>>> GetAllNegotiations()
         {
           if (_context.NegotiationModel == null)
           {
@@ -38,7 +38,7 @@ namespace NegotiationsApi.Controllers
 
         // GET: api/Negotiations/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<NegotiationModel>> GetNegotiationModel(int id)
+        public async Task<ActionResult<NegotiationModel>> GetNegotiation(int id)
         {
           if (_context.NegotiationModel == null)
           {
@@ -56,7 +56,7 @@ namespace NegotiationsApi.Controllers
 
         // DELETE: api/Negotiations/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteNegotiationModel(int id)
+        public async Task<IActionResult> DeleteNegotiation(int id)
         {
             if (_context.NegotiationModel == null)
             {
@@ -74,18 +74,33 @@ namespace NegotiationsApi.Controllers
             return NoContent();
         }
 
-        // POST: api/Negotiations
+        // POST: api/Negotiations (Customer method)
         [HttpPost("{productId}/{customerId}/{proposedPrice}")]
-        public async Task<ActionResult<NegotiationModel>> PostNegotiation(int productId, int customerId, decimal proposedPrice)
+        public async Task<ActionResult<NegotiationModel>> CustomerPostNegotiation(int productId, int customerId, decimal proposedPrice)
         {
             return await _negotiationService.AddNegotiation(productId, customerId, proposedPrice);
         }
 
-        // PUT: api/Negotiations
+        // PUT: api/Negotiations (Customer method)
         [HttpPut("{productId}/{customerId}/{proposedPrice}")]
-        public async Task<ActionResult<NegotiationModel>> PutNegotiation(int productId, int customerId, decimal proposedPrice)
+        public async Task<ActionResult<NegotiationModel>> CustomerPutNegotiation(int productId, int customerId, decimal proposedPrice)
         {
             return await _negotiationService.UpdateNegotiation(productId, customerId, proposedPrice);
+        }
+
+        // PUT: api/Negotiations (Employee method)
+        [HttpPut("{id}")]
+        public async Task<ActionResult<NegotiationModel>> EmployeePutNegotiation(int id, NegotiationModel.NegotiationStatus status)
+        {
+            if (_context.NegotiationModel == null)
+                return NotFound();
+            var negotiation = await _context.NegotiationModel.FindAsync(id);
+            if (negotiation == null)
+                return NotFound();
+            negotiation.Status = status; // accept or decline
+            await _context.SaveChangesAsync();
+
+            return new OkObjectResult(negotiation);
         }
     }
 }

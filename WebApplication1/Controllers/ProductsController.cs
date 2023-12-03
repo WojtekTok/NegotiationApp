@@ -23,7 +23,7 @@ namespace NegotiationsApi.Controllers
 
         // GET: api/Products
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductModel>>> GetProductModel()
+        public async Task<ActionResult<IEnumerable<ProductModel>>> GetAllProducts()
         {
           if (_context.ProductModel == null)
           {
@@ -34,7 +34,7 @@ namespace NegotiationsApi.Controllers
 
         // GET: api/Products/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<ProductModel>> GetProductModel(int id)
+        public async Task<ActionResult<ProductModel>> GetProduct(int id)
         {
           if (_context.ProductModel == null)
           {
@@ -52,7 +52,7 @@ namespace NegotiationsApi.Controllers
 
         // POST: api/Products
         [HttpPost]
-        public async Task<ActionResult<ProductModel>> PostProductModel(ProductModel productModel)
+        public async Task<ActionResult<ProductModel>> PostProduct(ProductModel productModel)
         {
           if (_context.ProductModel == null)
           {
@@ -66,7 +66,7 @@ namespace NegotiationsApi.Controllers
 
         // DELETE: api/Products/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteProductModel(int id)
+        public async Task<IActionResult> DeleteProduct(int id)
         {
             if (_context.ProductModel == null)
             {
@@ -82,11 +82,6 @@ namespace NegotiationsApi.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
-        }
-
-        private bool ProductModelExists(int id)
-        {
-            return (_context.ProductModel?.Any(e => e.Id == id)).GetValueOrDefault();
         }
     }
 }
