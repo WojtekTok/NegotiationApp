@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NegotiationsApi.Data;
 using NegotiationsApi.Models;
+using NegotiationsApi.Repositories;
 
 namespace NegotiationsApi.Controllers
 {
@@ -14,72 +15,58 @@ namespace NegotiationsApi.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IProductRepository _productRepository;
 
-        public ProductsController(AppDbContext context)
+        public ProductsController(IProductRepository productRepository)
         {
-            _context = context;
+            _productRepository = productRepository;
         }
 
         // GET: api/Products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ProductModel>>> GetAllProducts()
         {
-          if (_context.ProductModel == null)
-          {
-              return NotFound();
-          }
-            return await _context.ProductModel.ToListAsync();
+             var products = await _productRepository.GetAllProductsAsync();
+             if (products == null)
+             {
+                  return NotFound();
+             }
+             return Ok(products);
         }
 
         // GET: api/Products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductModel>> GetProduct(int id)
         {
-          if (_context.ProductModel == null)
-          {
-              return NotFound();
-          }
-            var productModel = await _context.ProductModel.FindAsync(id);
-
-            if (productModel == null)
+            var product = await _productRepository.GetProductByIdAsync(id);
+            if (product == null)
             {
                 return NotFound();
             }
 
-            return productModel;
+            return Ok(product);
         }
 
         // POST: api/Products
         [HttpPost]
         public async Task<ActionResult<ProductModel>> PostProduct(ProductModel productModel)
         {
-          if (_context.ProductModel == null)
-          {
-              return Problem("Entity set 'AppDbContext.ProductModel'  is null.");
-          }
-            _context.ProductModel.Add(productModel);
-            await _context.SaveChangesAsync();
+            await _productRepository.AddProductAsync(productModel);
 
-            return CreatedAtAction("GetProductModel", new { id = productModel.Id }, productModel);
+            return CreatedAtAction("GetProduct", new { id = productModel.Id }, productModel);
         }
 
         // DELETE: api/Products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            if (_context.ProductModel == null)
-            {
-                return NotFound();
-            }
-            var productModel = await _context.ProductModel.FindAsync(id);
-            if (productModel == null)
+            var product = await _productRepository.GetProductByIdAsync(id);
+            if (product == null)
             {
                 return NotFound();
             }
 
-            _context.ProductModel.Remove(productModel);
-            await _context.SaveChangesAsync();
+            await _productRepository.DeleteProductAsync(id);
 
             return NoContent();
         }

@@ -4,6 +4,7 @@ using Moq;
 using NegotiationsApi.Controllers;
 using NegotiationsApi.Data;
 using NegotiationsApi.Models;
+using NegotiationsApi.Repositories;
 using NegotiationsApi.Services;
 using System;
 using System.Collections.Generic;
@@ -165,46 +166,35 @@ namespace Tests
         public async Task CustomerPostNegotiation_ReturnsCreatedResultForValidNegotiation()
         {
             // Arrange
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase4")
-                .Options;
+            var negotiationRepositoryMock = new Mock<INegotiationRepository>();
+            var productRepositoryMock = new Mock<IProductRepository>();
 
-            using (var context = new AppDbContext(options))
-            {
-                context.ProductModel.Add(new ProductModel { Name = "TestProduct", BasePrice = 10.0m });
-                context.SaveChanges();
-            }
-            
-            using (var context = new AppDbContext(options))
-            {
-                var negotiationService = new NegotiationService(context);
-                var controller = new NegotiationsController(context, negotiationService);
+            negotiationRepositoryMock.Setup(repo => repo.AddNegotiationAsync(It.IsAny<NegotiationModel>()))
+                .Returns((NegotiationModel negotiation) => Task.FromResult(negotiation));
 
-                var productId = 1;
-                var customerId = 1;
-                var proposedPrice = 15.0m;
+            var negotiationService = new NegotiationService(negotiationRepositoryMock.Object, productRepositoryMock.Object);
+            var controller = new NegotiationsController(negotiationService);
 
-                // Act
-                var result = await controller.CustomerPostNegotiation(productId, customerId, proposedPrice);
+            var productId = 1;
+            var customerId = 1;
+            var proposedPrice = 15.0m;
 
-                // Assert
-                var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+            // Act
+            var result = await controller.CustomerPostNegotiation(productId, customerId, proposedPrice);
 
-                var negotiation = Assert.IsType<NegotiationModel>(createdAtActionResult.Value);
+            // Assert
+            var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
 
-                Assert.Equal(productId, negotiation.ProductId);
-                Assert.Equal(customerId, negotiation.CustomerId);
-                Assert.Equal(proposedPrice, negotiation.ProposedPrice);
-                Assert.Equal(customerId, negotiation.CustomerId);
-                Assert.Equal(NegotiationModel.NegotiationStatus.Pending, negotiation.Status);
+            var negotiation = Assert.IsType<NegotiationModel>(createdAtActionResult.Value);
 
-                var savedNegotiation = await context.NegotiationModel.FindAsync(negotiation.Id);
-                Assert.NotNull(savedNegotiation);
-                Assert.Equal(productId, savedNegotiation.ProductId);
-                Assert.Equal(customerId, savedNegotiation.CustomerId);
-                Assert.Equal(proposedPrice, savedNegotiation.ProposedPrice);
-                Assert.Equal(NegotiationModel.NegotiationStatus.Pending, savedNegotiation.Status);
-            }
+            Assert.Equal(productId, negotiation.ProductId);
+            Assert.Equal(customerId, negotiation.CustomerId);
+            Assert.Equal(proposedPrice, negotiation.ProposedPrice);
+            Assert.Equal(customerId, negotiation.CustomerId);
+            Assert.Equal(NegotiationModel.NegotiationStatus.Pending, negotiation.Status);
+
+            negotiationRepositoryMock.Verify(repo => repo.AddNegotiationAsync(It.IsAny<NegotiationModel>()), Times.Once);
+        }
         }//TODO: ma sprawdzić: czy dla produktu o cenie bazowej x dla propozycji 2 razy większej dostaniemy odrzucenie a dla normalnej pending
         // Potem czy jeśli dodam dla tych samych id czy mi wyskoczy że już istnieje taka negocjacja
 
@@ -399,4 +389,4 @@ namespace Tests
             Assert.IsType<NotFoundResult>(result.Result);
         }
     }
-}
+

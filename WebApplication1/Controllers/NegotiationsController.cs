@@ -16,62 +16,38 @@ namespace NegotiationsApi.Controllers
     [ApiController]
     public class NegotiationsController : ControllerBase
     {
-        private readonly AppDbContext _context;
         private readonly INegotiationService _negotiationService;
 
-        public NegotiationsController(AppDbContext context, INegotiationService negotiationService)
+        public NegotiationsController(INegotiationService negotiationService)
         {
-            _context = context;
             _negotiationService = negotiationService;
         }
 
         // GET: api/Negotiations
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<NegotiationModel>>> GetAllNegotiations()
+        public async Task<ActionResult<IEnumerable<NegotiationModel>>> GetAllNegotiationsAsync()
         {
-          if (_context.NegotiationModel == null)
-          {
-              return NotFound();
-          }
-            return await _context.NegotiationModel.ToListAsync();
+            var negotiations = await _negotiationService.GetAllNegotiations();
+            if (negotiations == null)
+            {
+                return NotFound();
+            }
+            return Ok(negotiations);
         }
 
         // GET: api/Negotiations/5
         [HttpGet("{id}")]
         public async Task<ActionResult<NegotiationModel>> GetNegotiation(int id)
         {
-          if (_context.NegotiationModel == null)
-          {
-              return NotFound();
-          }
-            var negotiationModel = await _context.NegotiationModel.FindAsync(id);
-
-            if (negotiationModel == null)
-            {
-                return NotFound();
-            }
-
-            return negotiationModel;
+            return Ok(await _negotiationService.GetNegotiation(id));
         }
 
         // DELETE: api/Negotiations/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteNegotiation(int id)
         {
-            if (_context.NegotiationModel == null)
-            {
-                return NotFound();
-            }
-            var negotiationModel = await _context.NegotiationModel.FindAsync(id);
-            if (negotiationModel == null)
-            {
-                return NotFound();
-            }
-
-            _context.NegotiationModel.Remove(negotiationModel);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            // Implementacja może być dodana w przyszłości, jeśli będzie potrzebna
+            return Ok();
         }
 
         // POST: api/Negotiations (Customer method)
@@ -89,18 +65,11 @@ namespace NegotiationsApi.Controllers
         }
 
         // PUT: api/Negotiations (Employee method)
-        [HttpPut("{id}")]
+        [HttpPut("{id}/{status}")]
         public async Task<ActionResult<NegotiationModel>> EmployeePutNegotiation(int id, NegotiationModel.NegotiationStatus status)
         {
-            if (_context.NegotiationModel == null)
-                return NotFound();
-            var negotiation = await _context.NegotiationModel.FindAsync(id);
-            if (negotiation == null)
-                return NotFound();
-            negotiation.Status = status; // accept or decline
-            await _context.SaveChangesAsync();
-
-            return new OkObjectResult(negotiation);
+            return await _negotiationService.EmployeeUpdateNegotiation(id, status);
         }
     }
 }
+

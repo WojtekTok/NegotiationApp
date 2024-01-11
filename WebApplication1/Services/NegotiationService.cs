@@ -2,25 +2,28 @@
 using NegotiationsApi.Services;
 using NegotiationsApi.Data;
 using NegotiationsApi.Models;
+using NegotiationsApi.Repositories;
 
 namespace NegotiationsApi.Services
 {
     public class NegotiationService : INegotiationService
     {
-        private readonly AppDbContext _context;
+        private readonly INegotiationRepository _negotiationRepository;
+        private readonly IProductRepository _productRepository;
 
-        public NegotiationService(AppDbContext context)
+        public NegotiationService(INegotiationRepository negotiationRepository, IProductRepository productRepository)
         {
-            _context = context;
+            _negotiationRepository = negotiationRepository;
+            _productRepository = productRepository;
         }
 
         public async Task<ActionResult<NegotiationModel>> AddNegotiation(int productId, int customerId, decimal proposedPrice)
         {
-            if (_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
+            if (await _negotiationRepository.NegotiationExists(productId, customerId))
                 return new BadRequestObjectResult("Negocjacja o ten produkt już istnieje");
             else
             {
-                int wasRejected = ProcessNegotiation(productId, customerId, proposedPrice, out NegotiationModel.NegotiationStatus status);
+                (int wasRejected, NegotiationModel.NegotiationStatus status) = await ProcessNegotiationAsync(productId, proposedPrice);
                 var negotiation = new NegotiationModel()
                 {
                     ProductId = productId,
@@ -29,22 +32,20 @@ namespace NegotiationsApi.Services
                     AttemptsLeft = 3 - wasRejected,
                     Status = status
                 };
-                _context.NegotiationModel.Add(negotiation);
-                await _context.SaveChangesAsync();
+                await _negotiationRepository.AddNegotiationAsync(negotiation);
 
-                return new CreatedAtActionResult("GetNegotiationModel", "Negotiations", new { id = negotiation.Id }, negotiation);
+                return new CreatedAtActionResult("GetNegotiation", "Negotiations", new { id = negotiation.Id }, negotiation);
             }
         }
 
         public async Task<ActionResult<NegotiationModel>> UpdateNegotiation(int productId, int customerId, decimal proposedPrice)
         {
-            if (!_context.NegotiationModel.Any(n => n.ProductId == productId && n.CustomerId == customerId))
+            if (!await _negotiationRepository.NegotiationExists(productId, customerId))
                 return new BadRequestObjectResult("Negocjacja o ten produkt nie istnieje");
             else
             {
-                int wasRejected = ProcessNegotiation(productId, customerId, proposedPrice, out NegotiationModel.NegotiationStatus status);
-                var existingNegotiation = _context.NegotiationModel
-                    .FirstOrDefault(n => n.ProductId == productId && n.CustomerId == customerId);
+                (int wasRejected, NegotiationModel.NegotiationStatus status) = await ProcessNegotiationAsync(productId, proposedPrice);
+                var existingNegotiation = await _negotiationRepository.GetNegotiationAsync(productId, customerId);
 
                 if (existingNegotiation.Status == NegotiationModel.NegotiationStatus.Pending)
                     return new BadRequestObjectResult("Ostatnia oferta oczekuje nadal oczekuje na decyzję.");
@@ -60,24 +61,48 @@ namespace NegotiationsApi.Services
                 existingNegotiation.Status = status;
                 existingNegotiation.ProposedPrice = proposedPrice;
 
-                await _context.SaveChangesAsync();
+                await _negotiationRepository.UpdateNegotiationAsync(existingNegotiation);
 
                 return new OkObjectResult(existingNegotiation);
             }
         }
 
-        private int ProcessNegotiation(int productId, int customerId, decimal proposedPrice, out NegotiationModel.NegotiationStatus status)
+        private async Task<(int, NegotiationModel.NegotiationStatus)> ProcessNegotiationAsync(int productId, decimal proposedPrice)
         {
             int wasRejected = 0;
-            status = NegotiationModel.NegotiationStatus.Pending;
-            var basePrice = _context.ProductModel.Find(productId)?.BasePrice;
-
-            if (basePrice.HasValue && proposedPrice > basePrice * 2)
+            var status = NegotiationModel.NegotiationStatus.Pending;
+            var product = await _productRepository.GetProductByIdAsync(productId);
+            if (product != null && proposedPrice > product.BasePrice * 2)
             {
                 wasRejected = 1;
                 status = NegotiationModel.NegotiationStatus.Rejected;
             }
-            return wasRejected;
+            return (wasRejected, status);
+        }
+        public async Task<ActionResult<NegotiationModel>> EmployeeUpdateNegotiation(int id, NegotiationModel.NegotiationStatus status)
+        {
+            var negotiation = await _negotiationRepository.GetNegotiationByIdAsync(id);
+
+            if (negotiation == null)
+            {
+                return new NotFoundObjectResult("Negotiation not found");
+            }
+
+            negotiation.Status = status;
+            await _negotiationRepository.UpdateNegotiationAsync(negotiation);
+
+            return new OkObjectResult(negotiation);
+        }
+
+        public async Task<IEnumerable<NegotiationModel>> GetAllNegotiations()
+        {
+            return await _negotiationRepository.GetAllNegotiationsAsync();
+        }
+
+        public async Task<NegotiationModel> GetNegotiation(int id)
+        {
+            return await _negotiationRepository.GetNegotiationByIdAsync(id);
         }
     }
 }
+
