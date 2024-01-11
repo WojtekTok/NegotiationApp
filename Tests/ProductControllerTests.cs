@@ -3,9 +3,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 using NegotiationsApi.Controllers;
 using NegotiationsApi.Data;
 using NegotiationsApi.Models;
+using NegotiationsApi.Repositories;
 
 namespace Tests
 {
@@ -15,102 +17,76 @@ namespace Tests
         public async Task GetAllProducts_ReturnsOkResult()
         {
             // Arrange
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
-                .Options;
+            var productRepositoryMock = new Mock<IProductRepository>();
+            var testProduct = new ProductModel { Name = "TestProduct", BasePrice = 10.0m };
+            productRepositoryMock.Setup(repo => repo.GetAllProductsAsync()).ReturnsAsync(new List<ProductModel> { testProduct });
 
-            using (var context = new AppDbContext(options))
-            {
-                context.ProductModel.Add(new ProductModel { Name = "TestProduct", BasePrice = 10.0m });
-                context.SaveChanges();
-            }
+            var controller = new ProductsController(productRepositoryMock.Object);
 
             // Act
-            using (var context = new AppDbContext(options))
-            {
-                var controller = new ProductsController(context);
-                var result = await controller.GetAllProducts();
+            var result = await controller.GetAllProducts();
 
-                // Assert
-                var okResult = Assert.IsType<ActionResult<IEnumerable<ProductModel>>>(result);
-                var products = Assert.IsAssignableFrom<IEnumerable<ProductModel>>(okResult.Value);
-                Assert.NotEmpty(products);
-            }
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var products = Assert.IsAssignableFrom<IEnumerable<ProductModel>>(okResult.Value);
+            Assert.NotEmpty(products);
+            Assert.Contains(testProduct, products);
         }
 
         [Fact]
         public async Task GetProduct_ReturnsOkResultForValidId()
         {
             // Arrange
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
-                .Options;
+            var productRepositoryMock = new Mock<IProductRepository>();
+            var testProduct = new ProductModel { Id = 1, Name = "TestProduct", BasePrice = 10.0m };
+            productRepositoryMock.Setup(repo => repo.GetProductByIdAsync(It.IsAny<int>())).ReturnsAsync(testProduct);
+
+            var controller = new ProductsController(productRepositoryMock.Object);
 
             // Act
-            using (var context = new AppDbContext(options))
-            {
-                var controller = new ProductsController(context);
-                var result = await controller.GetProduct(1);
+            var result = await controller.GetProduct(1);
 
-                // Assert
-                var okResult = Assert.IsType<ActionResult<ProductModel>>(result);
-                var products = Assert.IsAssignableFrom<ProductModel>(okResult.Value);
-            }
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var product = Assert.IsType<ProductModel>(okResult.Value);
+            Assert.Equal(testProduct, product);
         }
 
         [Fact]
         public async Task PostProduct_ReturnsCreatedAtActionResult()
         {
             // Arrange
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
-                .Options;
+            var productRepositoryMock = new Mock<IProductRepository>();
+            productRepositoryMock.Setup(repo => repo.AddProductAsync(It.IsAny<ProductModel>())).Returns(Task.CompletedTask);
+
+            var controller = new ProductsController(productRepositoryMock.Object);
 
             // Act
-            using (var context = new AppDbContext(options))
-            {
-                var controller = new ProductsController(context);
-                var newProduct = new ProductModel { Name = "NewProduct", BasePrice = 15.0m };
-                var result = await controller.PostProduct(newProduct);
+            var newProduct = new ProductModel { Name = "NewProduct", BasePrice = 15.0m };
+            var result = await controller.PostProduct(newProduct);
 
-                // Assert
-                var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+            // Assert
+            var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
 
-                var createdProduct = Assert.IsType<ProductModel>(createdAtActionResult.Value);
-                Assert.Equal(newProduct.Id, createdProduct.Id);
-            }
+            var createdProduct = Assert.IsType<ProductModel>(createdAtActionResult.Value);
+            Assert.Equal(newProduct, createdProduct);
         }
 
         [Fact]
         public async Task DeleteProduct_ReturnsNoContentResult()
         {
             // Arrange
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: "TestDatabase")
-                .Options;
+            var productRepositoryMock = new Mock<IProductRepository>();
+            var testProduct = new ProductModel { Id = 1, Name = "TestProduct", BasePrice = 10.0m };
+            productRepositoryMock.Setup(repo => repo.GetProductByIdAsync(testProduct.Id)).ReturnsAsync(testProduct);
 
-            // Stworzenie nowego produktu do usuniêcia
-            var productToDelete = new ProductModel { Name = "ProductToDelete", BasePrice = 20.0m };
-
-            // Dodanie produktu do bazy danych
-            using (var context = new AppDbContext(options))
-            {
-                context.ProductModel.Add(productToDelete);
-                context.SaveChanges();
-            }
+            var controller = new ProductsController(productRepositoryMock.Object);
 
             // Act
-            using (var context = new AppDbContext(options))
-            {
-                var controller = new ProductsController(context);
-                var result = await controller.DeleteProduct(productToDelete.Id);
+            var result = await controller.DeleteProduct(testProduct.Id);
 
-                // Assert
-                Assert.IsType<NoContentResult>(result);
-
-                var deletedProduct = await context.ProductModel.FindAsync(productToDelete.Id);
-                Assert.Null(deletedProduct);
-            }
+            // Assert
+            Assert.IsType<NoContentResult>(result);
         }
     }
 }
